@@ -1,52 +1,57 @@
-//js:n ns. using statementit
 const express = require('express');
 const http = require('http');
 const websocket = require("ws");
-// terminaalissa lataa npm install sqlite3, jotta toimii
 const sqlite3 = require('sqlite3').verbose();
 
-// luodaan serverapp, servu ja serversocket.
 const serverapp = express();
 const servu = http.createServer(serverapp);
 const serversocket = new websocket.Server({ server: servu });
-// luodaan uusi tietokanta
+
 const cardsdb = new sqlite3.Database('tarotdeck.db');
 
-cardsdb.all('SELECT name FROM Cards', (err, rows) => {
-    if (err) {
-        console.error(err.message);
-    } else {
-        // prosessoidaan riveinä
-        console.log(rows);
-    }
+// Function to generate a random integer
+function generateRandomInt() {
+    return Math.floor(Math.random() * 22 + 1);
+}
+
+// Handle database retrieval
+serversocket.on('connection', (socketclient) => {
+    console.log("connection success c:");
+
+    socketclient.on('message', (message) => {
+        console.log("message received");
+        console.log(message.toString());
+
+        if (message.toString() === "random-int") {
+            // Generate a random integer
+            const randomTarot = generateRandomInt();
+
+            // Retrieve the data from the database using the random integer
+            const sqlSelect = `SELECT * FROM Cards WHERE id = ?`;
+
+            cardsdb.get(sqlSelect, [randomTarot], (err, row) => {
+                if (err) {
+                    console.error(err.message);
+                    socketclient.send("Error retrieving data from the database");
+                    return;
+                }
+
+                if (row) {
+                    // Send the retrieved data back to the client
+                    socketclient.send(JSON.stringify(row));
+                } else {
+                    socketclient.send("No data found for the random integer");
+                }
+            });
+        }
+    });
 });
 
-
-// Jos ei ole yhteyttä, antaa virheilmoituksen 
-serversocket.on('error', (error) => {
-    console.log("error in connection :c");
-})
-// jos on yhteys
-serversocket.on('connection', (socketclient) => {
-    console.log("connection succes c:");
-    // viestintä, ja otetaan vastaan viestit
-    socketclient.on('message', (message) => {
-        console.log("message recived");
-        console.log(message.toString());
-        //lähetetään takaisin viesti jos saatu viesti on random-int
-        // tämän yhdistäminen kun saadaan tietokanta toimimaan ja front-endin kanssa
-        if (message.toString() === "random-int") {
-            //otetaan random int ja muutetaan se stringiks
-            let randomtarot = Math.floor(Math.random() * 22 + 1);
-            socketclient.send("" + randomtarot);
-        }
-
-    })
-})
-// kuuntelee serveriä
 servu.listen(8000, () => {
     console.log("Server started");
-})
+});
 
-// lopuksi suljetaan tietokantayhteys
-cardsdb.close;
+// Close the database connection when the server is stopped
+servu.on('close', () => {
+    cardsdb.close();
+});
