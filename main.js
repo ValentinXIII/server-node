@@ -27,7 +27,7 @@ serversocket.on('connection', (socketclient) => {
             const randomTarot = generateRandomInt();
 
             // Retrieve the data from the database using the random integer
-            const sqlSelect = `SELECT * FROM Cards WHERE id = ?`;
+            const sqlSelect = `SELECT name, meaning FROM Cards WHERE id = ?`;
 
             cardsdb.get(sqlSelect, [randomTarot], (err, row) => {
                 if (err) {
@@ -37,8 +37,9 @@ serversocket.on('connection', (socketclient) => {
                 }
 
                 if (row) {
-                    // Send the retrieved data back to the client
-                    socketclient.send(JSON.stringify(row));
+                    // Send the retrieved data back to the client separately
+                    socketclient.send(JSON.stringify({ name: row.name }));
+                    socketclient.send(JSON.stringify({ meaning: row.meaning }));
                 } else {
                     socketclient.send("No data found for the random integer");
                 }
